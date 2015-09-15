@@ -1,0 +1,9 @@
+<launch>
+
+  <arg name="global_yaml" />
+
+  <rosparam param="global_params" command="load" file="$(arg global_yaml)" /> 
+
+  <node name="pilot_ddp" pkg="c2_ros" type="pilot_ddp" output="screen" clear_params="true" required="true" />  
+
+</launch>
