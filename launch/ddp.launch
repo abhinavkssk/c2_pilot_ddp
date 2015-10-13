@@ -4,6 +4,6 @@
 
   <rosparam param="global_params" command="load" file="$(arg global_yaml)" /> 
 
-  <node name="pilot_ddp" pkg="c2_ros" type="pilot_ddp" output="screen" clear_params="true" required="true" />  
+  <node name="pilot_ddp2" pkg="c2_pilot_ddp" type="pilot_ddp2" output="screen" clear_params="true" required="true" />  
 
 </launch>
