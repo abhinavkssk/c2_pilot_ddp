@@ -30,7 +30,7 @@
 #include <stdio.h>
 
 
-#define MAX_SPEED 5
+#define DEFAULT_MAX_SPEED 5
 using namespace std;
 using namespace Eigen;
 using namespace gcop;
@@ -49,6 +49,7 @@ gcop_comm::CtrlTraj trajectory;
 ros::Publisher trajpub;
 ros::Subscriber odom_est_sub;
 double  thrust_offset=0;
+double MAX_SPEED=5.0;
 
 Body2dForce<2> force;
 Body2d<2> sys(&force);
@@ -329,7 +330,7 @@ public:
 	{
 		//calculate the distance from the current position to destination pose
 		double dist = asco::Utils::getDist2D(StatetoPose2D(x0), wp.pose);
-
+		ROS_INFO("Current DDP goal pt is ( %f , %f ) and dist to it is %f ", wp.pose.position.x, wp.pose.position.y, dist);
 		if(dist > wp.m_pt_radius){
 
 			poseTwistToState(xf,wp.pose,wp.twist);
@@ -422,7 +423,7 @@ public:
 					subState.pose.position.y = p.y * (1-i) + (*it).pose.position.y * i ;
 					subState.twist=(*it).twist;
 					return_traj.trajectory.push_back(subState);
-					ROS_INFO("[%s]:sub[%d] - x=%f y=%f",agentName.c_str(),k,p.x,p.y);
+					ROS_INFO("[%s]:sub[%d] - x=%f y=%f",agentName.c_str(),k,subState.pose.position.x,subState.pose.position.y);
 				}
 			}
 			else
@@ -467,6 +468,10 @@ int main (int argc, char ** argv)
 {
 	ros::init(argc, argv, C2::C2Agent(C2::C2Agent::PILOT).toString());
 	ros::NodeHandle nh;
+                
+                if (!nh.getParam("/c2_params/default_max_speed",MAX_SPEED)) MAX_SPEED = DEFAULT_MAX_SPEED;
+
+
 
 	dynamic_reconfigure::Server<c2_pilot_ddp::DDPInterfaceConfig> server;
 	dynamic_reconfigure::Server<c2_pilot_ddp::DDPInterfaceConfig>::CallbackType f;
