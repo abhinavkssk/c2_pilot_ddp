@@ -59,7 +59,6 @@ vector<double> ts(N+1);
 Vector2d u(0,0);
 vector<Vector2d> us(N, u);
 double tfinal = 5;
-bool aimingalreadydone=false;
 
 void paramreqcallback(c2_pilot_ddp::DDPInterfaceConfig &config, uint32_t level)
 {
@@ -244,7 +243,10 @@ public:
 		force.D(0)= 0.01;
 		force.D(1)= 0.02;
 		force.D(2)= 5;
-
+		force.isdampDiff=true;
+		force.D_rev(0)=0.01;
+		force.D_rev(1)=100;
+		force.D_rev(2)=5;
 		MatrixXd m(3,2);
 		m << 0.265,-0.265,1,1,0,0;
 		force.B=m;
@@ -290,7 +292,6 @@ public:
 					isCurWayPtReached = false;
 					curWaypt = poseToRun.trajectory.at(poseCnt);
 					ROS_INFO("[%s]: Navigating to x=%f, y=%f",agentName.c_str(),curWaypt.pose.position.x,curWaypt.pose.position.y);
-					aimingalreadydone=false;
 					poseCnt++;
 				}
 				else
@@ -315,7 +316,6 @@ public:
 
 	inline void stopVehicle()
 	{
-		aimingalreadydone=false;
 		mavros::ActuatorControl actuator_control_msg;
 		//controls[1] goes to right thruster, controls[3] goes to left thruster.
 		actuator_control_msg.header.stamp = ros::Time::now();
@@ -330,100 +330,13 @@ public:
 		actuator_control_msg.controls[7] = 0.0;
 		actuator_controls_pub.publish(actuator_control_msg);
 	}
-	bool aimBy(c2_ros_msgs::State3D wp)
-	{
-	
-	
-		double dist = abs( angles::shortest_angular_distance(StatetoPose2D(x0).theta, tf::getYaw(wp.pose.orientation)))*180/M_PI;
-		ROS_INFO("Angle diff is %f", dist);
-		if(dist > m_theta_diff){
-
-			poseTwistToState(xf,wp.pose,wp.twist);
-			LqCost<Body2dState, 6, 2> cost(sys, tfinal, xf);
-
-
-			cost.Q = Q.asDiagonal();
-			cost.Qf = Qf.asDiagonal();
-			cost.R = R.asDiagonal();
-
-			vector<pair<Matrix3d, Vector3d> > xs(N+1);
-
-
-			xs[0]= x0;
-
-			std::rotate(us.begin(), us.begin() + 1, us.end());
-			Body2dDdp ddp(sys, cost, ts, xs, us);
-			ddp.mu = MU;
-
-			ddp.eps=eeps;
-			ddp.debug = false;
-			///struct timeval timer;
-			for (int i = 0; i < iters; ++i)
-			{
-				// timer_start(timer);
-				ddp.Iterate();
-				//  long te = timer_us(timer);
-				// cout << "Iteration #" << i << " took: " << te << " us." << endl;
-
-			}
-
-			pubtraj(xs,us,xf,ts);
-
-			//send control signal to the thruster
-			mavros::ActuatorControl actuator_control_msg;
-			//controls[1] goes to right thruster, controls[3] goes to left thruster.
-			actuator_control_msg.header.stamp = ros::Time::now();
-			actuator_control_msg.group_mix = 0;
-			actuator_control_msg.controls[0] = 0.0;
-			actuator_control_msg.controls[1] = FtoLevel(us[0][0]);
-			actuator_control_msg.controls[2] = 0.0;
-			actuator_control_msg.controls[3] = FtoLevel(us[0][1]);
-			actuator_control_msg.controls[4] = 0.0;
-			actuator_control_msg.controls[5] = 0.0;
-			actuator_control_msg.controls[6] = 0.0;
-			actuator_control_msg.controls[7] = 0.0;
-			actuator_controls_pub.publish(actuator_control_msg);
-
-			return false;
-		}
-
-		ROS_INFO("Initial Aiming Done");
-		return true;
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	}
 	
 	
 	bool navigateTo(c2_ros_msgs::State3D wp)
 	{
-		//calculate the distance from the current position to destination pose
-		if(!aimingalreadydone)
-		{
-			c2_ros_msgs::State3D wpi=wp;
-			geometry_msgs::Pose2D x0_pose2d=StatetoPose2D(x0);
-			double lineslope=atan2((wp.pose.position.y-x0_pose2d.y),(wp.pose.position.x-x0_pose2d.x));
-			double reqangle=lineslope-x0_pose2d.theta;
 
-			geometry_msgs::Quaternion reqQuat= tf::createQuaternionMsgFromYaw (reqangle);
-			wpi.pose.position.x=x0_pose2d.x;wpi.pose.position.y=x0_pose2d.y;wpi.pose.orientation=reqQuat;
-			if(aimBy( wpi))
-				aimingalreadydone=true;
-		
-		}
-		
-		else
-		{
 		double dist = asco::Utils::getDist2D(StatetoPose2D(x0), wp.pose);
-		ROS_INFO("Current DDP goal pt is ( %f , %f ) and dist to it is %f ", wp.pose.position.x, wp.pose.position.y, dist);
+		ROS_INFO("DDP Goal (x,y,theta)=( %f ,%f ,%f ) vx=%f and dist to it is %f  ", wp.pose.position.x, wp.pose.position.y,tf::getYaw(wp.pose.orientation) ,wp.twist.linear.x,dist);
 		if(dist > wp.m_pt_radius){
 
 			poseTwistToState(xf,wp.pose,wp.twist);
@@ -478,9 +391,9 @@ public:
 		ROS_INFO("[%s]:reached x=%f, y=%f",agentName.c_str(),wp.pose.position.x,wp.pose.position.y);
 		return true;
 		
-		}
 		
-		return false;
+		
+		
 	}
 
 	void onStop()
