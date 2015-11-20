@@ -175,9 +175,10 @@ geometry_msgs::Pose2D StatetoPose2D(const Body2dState x)
 	geometry_msgs::Pose2D pose;
 	const Matrix3d x_gmat=x.first;
 	SE2::Instance().g2q(xpose, x_gmat);
-	pose.x=xpose(0);
-	pose.y=xpose(1);
-	pose.theta=xpose(2);
+	pose.x=xpose(1);
+	pose.y=xpose(2);
+	pose.theta=xpose(0);
+	std::cout<<" x is "<<pose.x<<" y is "<<pose.y<<" theta is "<<pose.theta<<std::endl;
 	return pose;
 }
 
